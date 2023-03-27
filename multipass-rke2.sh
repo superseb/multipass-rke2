@@ -5,10 +5,12 @@
 NAME=""
 # Ubuntu image to use (xenial/bionic/focal)
 IMAGE="focal"
+# RKE2 channel
+RKE2_CHANNEL="latest"
 # RKE2 version
-#RKE2_VERSION="v1.18.10+rke2r1"
+#RKE2_VERSION="v1.25.7+rke2r1"
 # How many additional server machines to create
-SERVER_COUNT_MACHINE="1"
+SERVER_COUNT_MACHINE="0"
 # How many machines to create
 AGENT_COUNT_MACHINE="1"
 # How many CPUs to allocate to each machine
@@ -37,17 +39,23 @@ else
 fi
 
 if [ -z $TOKEN ]; then
-    TOKEN=$(cat /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1 | tr '[:upper:]' '[:lower:]')
+    TOKEN=$(cat /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | fold -w 20 | head -n 1)
     echo "No agent token given, generated agent token: ${TOKEN}"
 fi
 
 # Check if name is given or create random string
 if [ -z $NAME ]; then
-    NAME=$(cat /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | fold -w 6 | head -n 1 | tr '[:upper:]' '[:lower:]')
+    NAME=$(cat /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
     echo "No name given, generated name: ${NAME}"
 fi
 
-echo "Creating cluster ${NAME} with ${SERVER_COUNT_MACHINE} servers and ${AGENT_COUNT_MACHINE} agents"
+if [ -n "$RKE2_VERSION" ]; then
+    CLOUD_INIT_INSTALL="INSTALL_RKE2_VERSION=${RKE2_VERSION}"
+else
+    CLOUD_INIT_INSTALL="INSTALL_RKE2_CHANNEL=${RKE2_CHANNEL}"
+fi
+
+echo "Creating cluster ${NAME} with ${SERVER_COUNT_MACHINE} additional servers and ${AGENT_COUNT_MACHINE} agents"
 
 # Prepare cloud-init
 # Cloud init template
@@ -55,7 +63,7 @@ read -r -d '' SERVER_INIT_CLOUDINIT_TEMPLATE << EOM
 #cloud-config
 
 runcmd:
- - '\curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=$RKE2_VERSION sh -'
+ - '\curl -sfL https://get.rke2.io | $CLOUD_INIT_INSTALL sh -'
  - '\mkdir -p /etc/rancher/rke2'
  - '\echo "token: $TOKEN\nwrite-kubeconfig-mode: 644\ntls-san: example.rke2.io" > /etc/rancher/rke2/config.yaml'
  - '\systemctl daemon-reload'
@@ -87,7 +95,7 @@ if [ "${SERVER_COUNT_MACHINE}" -gt 0 ]; then
 #cloud-config
 
 runcmd:
- - '\curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=$RKE2_VERSION sh -'
+ - '\curl -sfL https://get.rke2.io | $CLOUD_INIT_INSTALL sh -'
  - '\mkdir -p /etc/rancher/rke2'
  - '\echo "server: $URL\ntoken: $TOKEN\nwrite-kubeconfig-mode: 644\ntls-san: example.rke2.io" > /etc/rancher/rke2/config.yaml'
  - '\systemctl daemon-reload'
@@ -98,15 +106,15 @@ EOM
 
     echo "Creating ${SERVER_COUNT_MACHINE} additional server instances"
     for i in $(eval echo "{1..$SERVER_COUNT_MACHINE}"); do
-        echo "Running $MULTIPASSCMD launch --cpus $SERVER_CPU_MACHINE --disk $SERVER_DISK_MACHINE --mem $SERVER_MEMORY_MACHINE $IMAGE --name rke2-server-$NAME-$i --cloud-init ${NAME}-cloud-init.yaml"                                                                                                                                           
-        $MULTIPASSCMD launch --cpus $SERVER_CPU_MACHINE --disk $SERVER_DISK_MACHINE --mem $SERVER_MEMORY_MACHINE $IMAGE --name rke2-server-$NAME-$i --cloud-init "${NAME}-cloud-init.yaml"
+        echo "Running $MULTIPASSCMD launch --cpus $SERVER_CPU_MACHINE --disk $SERVER_DISK_MACHINE --mem $SERVER_MEMORY_MACHINE $IMAGE --name "rke2-server-${NAME}-${i}" --cloud-init ${NAME}-cloud-init.yaml"
+        $MULTIPASSCMD launch --cpus $SERVER_CPU_MACHINE --disk $SERVER_DISK_MACHINE --mem $SERVER_MEMORY_MACHINE $IMAGE --name "rke2-server-${NAME}-${i}" --cloud-init "${NAME}-cloud-init.yaml"
         if [ $? -ne 0 ]; then
             echo "There was an error launching the instance"
             exit 1
         fi
 
         echo "Checking for Node being Ready on rke2-server-${NAME}-${i}"
-        $MULTIPASSCMD exec rke2-server-$NAME-$i -- /bin/bash -c 'while [[ $(sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers 2>/dev/null | grep -c -v "NotReady") -eq 0 ]]; do sleep 2; done'
+        $MULTIPASSCMD exec "rke2-server-${NAME}-${i}" -- /bin/bash -c 'while [[ $(sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers 2>/dev/null | grep "rke2-server-${NAME}-${i}" | grep -c -v "NotReady") -eq 0 ]]; do sleep 2; done'
         echo "Node is Ready on rke2-server-${NAME}-${i}"
     done
 fi
@@ -116,7 +124,7 @@ read -r -d '' AGENT_CLOUDINIT_TEMPLATE << EOM
 #cloud-config
 
 runcmd:
- - '\curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=$RKE2_VERSION INSTALL_RKE2_TYPE="agent" sh -'
+ - '\curl -sfL https://get.rke2.io | $CLOUD_INIT_INSTALL INSTALL_RKE2_TYPE="agent" sh -'
  - '\mkdir -p /etc/rancher/rke2'
  - '\echo "server: $URL\ntoken: $TOKEN" > /etc/rancher/rke2/config.yaml'
  - '\systemctl daemon-reload'
@@ -135,18 +143,18 @@ for i in $(eval echo "{1..$AGENT_COUNT_MACHINE}"); do
         exit 1
     fi
     echo "Checking for Node rke2-agent-$NAME-$i being registered"
-    $MULTIPASSCMD exec rke2-server-$NAME-1 -- bash -c "until sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers | grep -c rke2-agent-$NAME-1 >/dev/null; do sleep 2; done" 
+    $MULTIPASSCMD exec "rke2-server-${NAME}" -- bash -c "until sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers | grep -c "rke2-agent-${NAME}-${i}" >/dev/null; do sleep 2; done" 
     echo "Checking for Node rke2-agent-$NAME-$i being Ready"
-    $MULTIPASSCMD exec rke2-server-$NAME-1 -- bash -c "until sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers | grep rke2-agent-$NAME-1 | grep -c -v NotReady >/dev/null; do sleep 2; done" 
-    echo "Node rke2-agent-$NAME-$i is Ready on rke2-server-${NAME}-1"
+    $MULTIPASSCMD exec "rke2-server-${NAME}" -- bash -c "until sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes --no-headers | grep "rke2-agent-${NAME}-${i}" | grep -c -v NotReady >/dev/null; do sleep 2; done" 
+    echo "Node rke2-agent-$NAME-$i is Ready on rke2-server-${NAME}"
 done
 
-$MULTIPASSCMD copy-files rke2-server-$NAME-1:/etc/rancher/rke2/rke2.yaml $NAME-kubeconfig-orig.yaml
+$MULTIPASSCMD copy-files rke2-server-$NAME:/etc/rancher/rke2/rke2.yaml $NAME-kubeconfig-orig.yaml
 sed "/^[[:space:]]*server:/ s_:.*_: \"https://$(echo $SERVER_IP | sed -e 's/[[:space:]]//g'):6443\"_" $NAME-kubeconfig-orig.yaml > $NAME-kubeconfig.yaml
 
 echo "rke2 setup finished"
-$MULTIPASSCMD exec rke2-server-$NAME-1 -- sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes
+$MULTIPASSCMD exec rke2-server-$NAME -- sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes
 echo "You can now use the following command to connect to your cluster"
-echo "$MULTIPASSCMD exec rke2-server-${NAME}-1 -- sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes"
+echo "$MULTIPASSCMD exec rke2-server-${NAME} -- sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes"
 echo "Or use kubectl directly"
 echo "kubectl --kubeconfig ${NAME}-kubeconfig.yaml get nodes"
