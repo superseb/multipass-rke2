@@ -137,7 +137,7 @@ EOM
 create_multipass_node() {
     echo "Creating ${1} node"
     ${MULTIPASSCMD} launch --cpus "${2}" --disk "${3}" --memory "${4}" "${5}" \
-    --name "${1}" --cloud-init "${SUBDIR:-./}${6}" --timeout=600s
+    --name "${1}" --cloud-init "${SUBDIR:-./}${6}" --timeout=600
 }
 
 # A convenience function called throughout the code to detect node registration
