@@ -219,6 +219,12 @@ done
 
 # Retrieve the kubeconfig, edit server address, and merge it with the local
 # kubeconfig in order to use contexts.
+# shellcheck disable=SC2086
+if [ ! -d "$(dirname ${LOCALKUBECONFIG})" ]
+then
+    # shellcheck disable=SC2086
+    mkdir "$(dirname ${LOCALKUBECONFIG})"
+fi
 ${MULTIPASSCMD} copy-files "${NAME}-rke2-master-1:/etc/rancher/rke2/rke2.yaml" - | \
 sed "/^[[:space:]]*server:/ s_:.*_: \"https://${SERVER_IP}:6443\"_" > \
     "${LOCALKUBECONFIG}"
