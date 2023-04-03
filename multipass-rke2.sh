@@ -26,9 +26,6 @@
 # Author(s): Sebastiaan van Steenis
 #            Justin Cook
 
-# shellcheck source=/dev/null
-. env.sh
-
 set -o errexit nounset
 
 ## Configurable settings
@@ -68,7 +65,8 @@ if [ -x "$(command -v multipass.exe)" ]
 then
     # Windows
     MULTIPASSCMD="multipass.exe"
-elif [ -x "$(command -v multipass)" ]
+elif [ -x "$(command -v multipass)" ] && [ -x "$(command -v kubectl)" ] && \
+     [ -x "$(command -v jq)" ]
 then
     # Linux/MacOS
     MULTIPASSCMD="multipass"
@@ -229,8 +227,16 @@ chmod 0600 "${LOCALKUBECONFIG}"
 "${KUBECTL}" config delete-context "${NAME}-rke-cluster" || /usr/bin/true
 "${KUBECTL}" config delete-cluster "${NAME}-rke-cluster" || /usr/bin/true
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}:${LOCALKUBECONFIG}"
+# shellcheck disable=SC2086
+if [ ! -d "$(dirname ${KUBECONFIG%%:*})" ]
+then
+    # shellcheck disable=SC2086
+    mkdir "$(dirname ${KUBECONFIG%%:*})"
+fi
 "${KUBECTL}" config view --flatten > "${KUBECONFIG%%:*}"
 "${KUBECTL}" config set-context "${NAME}-rke-cluster" --namespace default
 
 echo "rke2 setup complete"
 "${KUBECTL}" get nodes
+
+echo "Please configure ${TLSSAN} to resolve to ${SERVER_IP}"
