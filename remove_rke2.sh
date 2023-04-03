@@ -22,9 +22,6 @@
 #
 # Remove multipass rke2 nodes configured from this code base.
 
-# shellcheck source=/dev/null
-. env.sh
-
 set -o errexit
 
 $(which kubectl) config delete-context generic-rke2-cluster || /usr/bin/true
