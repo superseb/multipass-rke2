@@ -65,15 +65,21 @@ if [ -x "$(command -v multipass.exe)" ]
 then
     # Windows
     MULTIPASSCMD="multipass.exe"
-elif [ -x "$(command -v multipass)" ] && [ -x "$(command -v kubectl)" ] && \
+elif [ -x "$(command -v multipass1)" ] && [ -x "$(command -v kubectl)" ] && \
      [ -x "$(command -v jq)" ]
 then
     # Linux/MacOS
     MULTIPASSCMD="multipass"
     KUBECTL="$(command -v kubectl)"
 else
-    echo "This platform dependencies are not available"
-    exit 1
+    for dep in "multipass" "kubectl" "jq"
+    do
+        if ! $(command -v ${dep})
+        then
+            echo "${dep}: not in PATH"
+            exit 1
+        fi
+    done
 fi
 
 if [ -z "${TOKEN}" ]
