@@ -65,7 +65,7 @@ if [ -x "$(command -v multipass.exe)" ]
 then
     # Windows
     MULTIPASSCMD="multipass.exe"
-elif [ -x "$(command -v multipass1)" ] && [ -x "$(command -v kubectl)" ] && \
+elif [ -x "$(command -v multipass)" ] && [ -x "$(command -v kubectl)" ] && \
      [ -x "$(command -v jq)" ]
 then
     # Linux/MacOS
@@ -74,7 +74,7 @@ then
 else
     for dep in "multipass" "kubectl" "jq"
     do
-        if ! $(command -v ${dep})
+        if ! command -v ${dep}
         then
             echo "${dep}: not in PATH"
             exit 1
