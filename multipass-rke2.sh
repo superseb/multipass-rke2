@@ -236,8 +236,7 @@ sed "/^[[:space:]]*server:/ s_:.*_: \"https://${SERVER_IP}:6443\"_" > \
     "${LOCALKUBECONFIG}"
 chmod 0600 "${LOCALKUBECONFIG}"
 
-"${KUBECTL}" config delete-context "${NAME}-rke-cluster" || /usr/bin/true
-"${KUBECTL}" config delete-cluster "${NAME}-rke-cluster" || /usr/bin/true
+"${KUBECTL}" config delete-context "${NAME}-rke2-cluster" || /usr/bin/true
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}:${LOCALKUBECONFIG}"
 # shellcheck disable=SC2086
 if [ ! -d "$(dirname ${KUBECONFIG%%:*})" ]
@@ -246,7 +245,7 @@ then
     mkdir "$(dirname ${KUBECONFIG%%:*})"
 fi
 "${KUBECTL}" config view --flatten > "${KUBECONFIG%%:*}"
-"${KUBECTL}" config set-context "${NAME}-rke-cluster" --namespace default
+"${KUBECTL}" config set-context "${NAME}-rke2-cluster" --namespace default
 
 echo "rke2 setup complete"
 "${KUBECTL}" get nodes
