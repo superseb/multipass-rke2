@@ -6,7 +6,7 @@ This script will create a configurable amount of instances using [multipass](htt
 
 * multipass (See [multipass: Getting it](https://github.com/CanonicalLtd/multipass#getting-it))
 
-This is tested on MacOS, Ubuntu Linux 20.04 and Windows 10.
+This is tested on MacOS and Ubuntu Linux 22.04.
 
 ## Running it
 
@@ -24,13 +24,13 @@ This will (defaults):
 * Additional certificate names (`tls-san`) is set to `rancher.test` (configurable using `TLSSAN`)
 * Store kubeconfig in `${HOME}/.kube/config-${NAME}` (configurable using `LOCALKUBECONFIG`)
 
-## Quickstart Ubuntu 20.04 droplet
+## Quickstart Ubuntu 22.04 droplet
 
 ```
 sudo snap install multipass jq
 wget https://raw.githubusercontent.com/superseb/multipass-rke2/master/multipass-rke2.sh
 bash multipass-rke2.sh
-curl -Lo /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x /usr/local/bin/kubectl
 kubectl --kubeconfig $HOME/.kube/config-* get nodes
 ```
