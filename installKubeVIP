@@ -1,0 +1,35 @@
+#!/bin/bash -eu
+export VIP_IP_ADDRESS=$1
+export VIP_INTERFACE=$2
+export TAG=v0.6.4
+
+# check that the interface exists
+ip r | grep default | grep $VIP_INTERFACE || {
+	echo interface $VIP_INTERFACE not found on default route - aborting
+        exit 1
+}
+
+# Get the RBAC config from the website
+mkdir -p /var/lib/rancher/rke2/server/manifests/
+curl -s https://kube-vip.io/manifests/rbac.yaml > /var/lib/rancher/rke2/server/manifests/kube-vip-rbac.yaml
+
+# use podman to create the VIP service via addon
+# https://docs.rke2.io/helm
+echo Installing podman for creation of kube-vip.yaml addon
+apt-get -qq  update || true
+apt-get -qq  install -y podman > /dev/null
+
+podman pull docker.io/plndr/kube-vip:$TAG
+
+alias kube-vip="podman run  --rm docker.io/plndr/kube-vip:$TAG"
+
+echo Creating the VIP Service
+podman run  --rm docker.io/plndr/kube-vip:$TAG  manifest daemonset \
+    --arp \
+    --interface $VIP_INTERFACE \
+    --address $VIP_IP_ADDRESS \
+    --controlplane \
+    --leaderElection \
+    --taint \
+    --services \
+    --inCluster > /var/lib/rancher/rke2/server/manifests/kube-vip.yaml
