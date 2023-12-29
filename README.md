@@ -23,6 +23,8 @@ This will (defaults):
 * Create two agents (configurable using `AGENT_NODE_COUNT`) with 2 CPU (`AGENT_NODE_CPU`), 40G disk (`AGENT_DISK_SIZE`) and 8G of memory (`AGENT_MEMORY_SIZE`) using Ubuntu jammy (`IMAGE`)
 * Additional certificate names (`tls-san`) is set to `rancher.test` (configurable using `TLSSAN`)
 * Store kubeconfig in `${HOME}/.kube/config-${NAME}` (configurable using `LOCALKUBECONFIG`)
+* Install ([kube-vip ](https://kube-vip.io/)) with support for both ingress and High Availability if rancher.test is configured with the VIP address
+* Allows for access of the cluster using the VIP address instead of the first of N masters and continues to operate when a master node is offline
 
 ## Quickstart Ubuntu 22.04 droplet
 

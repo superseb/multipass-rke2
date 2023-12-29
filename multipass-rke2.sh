@@ -36,7 +36,12 @@ IMAGE="jammy"
 # RKE2 channel
 RKE2_CHANNEL="stable"
 # RKE2 version
-#RKE2_VERSION="v1.24.12+rke2r1"
+# 1.28 has support for ARM
+RKE2_VERSION="v1.28.2+rke2r1"
+
+export RKE2_VIP_IP=192.168.206.6
+export RKE2_VIP_INTERFACE=enp0s1
+
 # How many master nodes to create
 MASTER_NODE_COUNT="1"
 # How many compute nodes to create
@@ -56,10 +61,10 @@ AGENT_MEMORY_SIZE="8G"
 TOKEN=""
 # Hostnames or IPv4/IPv6 addresses as Subject Alternative Names on the server
 # TLS cert
-TLSSAN="rancher.test"
+export TLSSAN="rancher.test"
 ## End configurable settings
 # Where to store the rke2 cluster kubeconfig
-LOCALKUBECONFIG="${HOME}/.kube/config-${NAME}"
+export LOCALKUBECONFIG="${HOME}/.kube/config-${NAME}"
 
 if [ -x "$(command -v multipass.exe)" ]
 then
@@ -81,6 +86,7 @@ else
         fi
     done
 fi
+export MULTIPASSCMD
 
 if [ -z "${TOKEN}" ]
 then
@@ -184,7 +190,7 @@ fi
 wait_on_node "${NAME}-rke2-master-1"
 
 # Retrieve info to join agent to cluster
-SERVER_IP=$($MULTIPASSCMD info "${NAME}-rke2-master-1" --format=json | \
+export SERVER_IP=$($MULTIPASSCMD info "${NAME}-rke2-master-1" --format=json | \
             jq -r ".info.\"${NAME}-rke2-master-1\".ipv4[0]")
 URL="https://${SERVER_IP}:9345"
 
@@ -250,4 +256,5 @@ fi
 echo "rke2 setup complete"
 "${KUBECTL}" get nodes
 
-echo "Please configure ${TLSSAN} to resolve to ${SERVER_IP}"
+echo Cluster initialized. Configuring it for HA and VIP at $RKE2_VIP_IP
+./setupVIP.sh
